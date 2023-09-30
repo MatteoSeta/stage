@@ -1,0 +1,123 @@
+library("haven")
+library("questionr")
+library("tidyverse")
+library("stargazer")
+library("plm")
+library("ivreg")
+library("AER)
+library("dplyr")
+library("data.table")
+library("dplyr")
+library("ggplot2")
+library("foreign")
+library("nnet")
+library("mlogit")
+library("reshape2")
+library("ff")
+
+colnames(STAGE) <- c("AN_RECENS", "DEP_RES_19", "DEP_NAIS", "DEP_TRA_19", "DEP_RAN_19", "REG_RES_19", "REG_NAIS", "REG_TRA_19",
+                        "REG_RAN_19", "AGE_REV", "SEXE", "STAT_CONJ", "NATIO", "DIPL", "TYP_ACT", "NES4", "CSP", "POND")
+
+STAGE <- subset(STAGE, select = -c(REG_TRA_19, DEP_TRA_19, REG_RES_19, DEP_RES_19, NES4, CSP, POND, NATIO))
+
+
+STAGE <- subset(STAGE, DIPL != "*")
+STAGE$DIPL <- replace(STAGE$DIPL, STAGE$DIPL == 0, "A")
+STAGE$DIPL <- replace(STAGE$DIPL, STAGE$DIPL == 1, "A")
+STAGE$DIPL <- replace(STAGE$DIPL, STAGE$DIPL == 2, "A")
+STAGE$DIPL <- replace(STAGE$DIPL, STAGE$DIPL == 3, "B")
+STAGE$DIPL <- replace(STAGE$DIPL, STAGE$DIPL == 4, "C")
+STAGE$DIPL <- replace(STAGE$DIPL, STAGE$DIPL == 5, "D")
+STAGE$DIPL <- replace(STAGE$DIPL, STAGE$DIPL == 6, "D")
+STAGE$DIPL <- replace(STAGE$DIPL, STAGE$DIPL == 7, "D")
+
+STAGE$DIPL <- replace(STAGE$DIPL, STAGE$DIPL == "A", 1)
+STAGE$DIPL <- replace(STAGE$DIPL, STAGE$DIPL == "B", 2)
+STAGE$DIPL <- replace(STAGE$DIPL, STAGE$DIPL == "C", 3)
+STAGE$DIPL <- replace(STAGE$DIPL, STAGE$DIPL == "D", 4)
+
+
+STAGE <- subset(STAGE, AGE_REV > 26 & AGE_REV < 35 & AN_RECENS > 1999)
+
+
+
+####### FIRST DIFF-IN-DIFF, ESTABLISHMENT OF TREATED,TIME,DID
+
+STAGE$time = ifelse(STAGE$AN_RECENS > 2012, 1, 0)
+
+STAGE$treated = ifelse( STAGE$AGE_REV <= 32, 1, 0)
+
+STAGE$did = STAGE$time * STAGE$treated 
+
+didreg = lm( DIPL ~ treated + time + did , data= STAGE )
+summary(didreg)
+
+
+####### CONTROL SEX
+
+STAGE$homme = ifelse(STAGE$SEXE != 1, 0, 1)
+
+didreg2 = lm( DIPL ~ treated + time + did + homme , data= STAGE )
+summary(didreg2)
+
+reg = lm(DIPL ~ sexeh, data= STAGE )
+summary(reg)
+
+# Effectuer la régression logistique multinomiale
+
+mlogit_model <- multinom(DIPL ~ time + treated + did, data = STAGE)
+mlogit_model2 <- multinom(DIPL ~ time + treated + did + homme, data = STAGE)
+mlogit_model3 <- multinom(DIPL ~ time + treated + did + factor(DEP_NAIS), data = STAGE, maxit  = 440)
+
+summary(mlogit_model)
+summary(mlogit_model2)
+summary(mlogit_model3)
+
+STAGE$te = ifelse(STAGE$AGE_REV == 28, 1, 0)
+STAGE$tn = ifelse(STAGE$AGE_REV == 29, 1, 0)
+STAGE$th = ifelse(STAGE$AGE_REV == 30, 1, 0)
+STAGE$to = ifelse(STAGE$AGE_REV == 31, 1, 0)
+STAGE$tt = ifelse(STAGE$AGE_REV == 32, 1, 0)
+STAGE$ttt = ifelse(STAGE$AGE_REV == 33, 1, 0)
+STAGE$tf = ifelse(STAGE$AGE_REV == 34, 1, 0)
+STAGE$seven = ifelse(STAGE$AN_RECENS == 2007, 1, 0)
+STAGE$eight = ifelse(STAGE$AN_RECENS == 2008, 1, 0)
+STAGE$nine = ifelse(STAGE$AN_RECENS == 2009, 1, 0)
+STAGE$ten = ifelse(STAGE$AN_RECENS == 2010, 1, 0)
+STAGE$eleven = ifelse(STAGE$AN_RECENS == 2011, 1, 0)
+STAGE$twelve = ifelse(STAGE$AN_RECENS == 2012, 1, 0)
+STAGE$thirteen = ifelse(STAGE$AN_RECENS == 2013, 1, 0)
+STAGE$sixt = ifelse(STAGE$AN_RECENS == 2016, 1, 0)
+STAGE$sevent = ifelse(STAGE$AN_RECENS == 2017, 1, 0)
+STAGE$eightt = ifelse(STAGE$AN_RECENS == 2018, 1, 0)
+STAGE$ninet = ifelse(STAGE$AN_RECENS == 2019, 1, 0)
+
+###### missing data for the years 2014, 2015. Age 27 reference for dummies.
+
+mlogit_modeldummies <- multinom(DIPL ~  did + te + tn +th + to +tt +ttt +tf
+                          +seven + eight +nine +ten +eleven +twelve +thirteen
+                          +sixt +sevent + eightt +ninet, data = STAGE)
+
+
+
+summary(mlogit_modeldummies)
+
+
+######## PLOT
+
+p <- ggplot(data=STAGE, aes(x=year, y=x, group=treated)) +
+  geom_line(aes(color=treated)) +
+  geom_point() +
+  ggtitle("Average degree level by group and year") +
+  geom_vline(aes(xintercept=2010), col="blue", size=1, linetype="solid")
+p<- p +labs(x="Year", y= "Average degree level")
+print(p)
+STAGE <- STAGEregate(Memoire0.0F$DIPL, by=list(treated = Memoire0.0F$treated, year = Memoire0.0F$AN_RECENS), FUN = mean)
+
+STAGE$treated <- as.character(STAGE$treated)
+STAGE$treated <- ifelse(STAGE$treated == "0", "Control Group", STAGE$treated)
+STAGE$treated <- ifelse(STAGE$treated == "1", "Treatment Group", STAGE$treated)
+
+never <- STAGE[STAGE$treated == "Control Group", ]
+g1 <- STAGE[STAGE$g == "2000", ]
+g2 <- STAGE[STAGE$g == "2011", ]
